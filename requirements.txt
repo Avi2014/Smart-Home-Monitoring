@@ -1,20 +1,17 @@
 # Python Dependencies for Smart Home IoT Monitoring System
 
 # MQTT Client Library
-paho-mqtt>=1.6.1
+paho-mqtt>=2.0.0
 
 # InfluxDB Client
 influxdb-client>=1.38.0
 
 # Data manipulation and analysis
-numpy>=1.26.0
-pandas>=2.1.0
+numpy>=1.24.0
+pandas>=2.0.0
 
 # For realistic sensor data simulation
 scipy>=1.11.0
-
-# JSON configuration handling
-python-dotenv>=1.0.0
 
 # Performance metrics and timing
 psutil>=5.9.5
@@ -22,5 +19,12 @@ psutil>=5.9.5
 # Logging and debugging
 colorlog>=6.7.0
 
-# Optional: For advanced data visualization in Python
-matplotlib>=3.8.0
+# Visualization
+matplotlib>=3.7.0
+
+# ⭐ ADD THESE TWO LINES FOR STREAMLIT DEPLOYMENT ⭐
+plotly>=5.14.0
+streamlit>=1.28.0
+
+# Optional: Environment variables
+python-dotenv>=1.0.0
