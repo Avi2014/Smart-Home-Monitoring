@@ -1,0 +1,63 @@
+{
+  "mqtt": {
+    "broker": "test.mosquitto.org",
+    "port": 1883,
+    "keepalive": 60,
+    "qos": 1,
+    "topics": {
+      "temperature": "hostel/room1/temperature",
+      "humidity": "hostel/room1/humidity",
+      "co2": "hostel/room1/co2",
+      "light": "hostel/room1/light"
+    }
+  },
+  "sensors": {
+    "temperature": {
+      "enabled": true,
+      "min_value": 18.0,
+      "max_value": 35.0,
+      "normal_range": [20.0, 28.0],
+      "unit": "°C",
+      "sampling_rate": 3,
+      "variance": 0.5
+    },
+    "humidity": {
+      "enabled": true,
+      "min_value": 30.0,
+      "max_value": 80.0,
+      "normal_range": [40.0, 60.0],
+      "unit": "%",
+      "sampling_rate": 3,
+      "variance": 2.0
+    },
+    "co2": {
+      "enabled": true,
+      "min_value": 400.0,
+      "max_value": 2000.0,
+      "normal_range": [400.0, 1000.0],
+      "unit": "ppm",
+      "sampling_rate": 5,
+      "variance": 50.0
+    },
+    "light": {
+      "enabled": true,
+      "min_value": 0.0,
+      "max_value": 1000.0,
+      "normal_range": [200.0, 800.0],
+      "unit": "lux",
+      "sampling_rate": 4,
+      "variance": 30.0
+    }
+  },
+  "simulation": {
+    "mode": "realistic",
+    "noise_enabled": true,
+    "random_spikes": true,
+    "spike_probability": 0.05
+  },
+  "battery": {
+    "initial_charge": 100.0,
+    "drain_per_message": 0.001,
+    "sleep_mode_enabled": false
+  }
+}
