@@ -1,194 +1,193 @@
 """
-IoT Alert System
+Fixed IoT Alert System with Better Debugging
 Monitors sensor data and triggers alarms when thresholds are exceeded
 """
-
 import paho.mqtt.client as mqtt
 import json
+import os
+import sys
 from datetime import datetime
-import winsound  # Windows sound library
-import time
 
-class IoTAlertSystem:
+# MQTT Configuration
+MQTT_BROKER = "test.mosquitto.org"
+MQTT_PORT = 1883
+MQTT_TOPICS = [
+    "hostel/room1/temperature",
+    "hostel/room1/humidity",
+    "hostel/room1/co2",
+    "hostel/room1/light"
+]
+
+# Alert Thresholds
+THRESHOLDS = {
+    'temperature': {'min': 20, 'max': 28, 'unit': '°C'},
+    'humidity': {'min': 40, 'max': 60, 'unit': '%'},
+    'co2': {'min': None, 'max': 1000, 'unit': 'ppm'},
+    'light': {'min': 200, 'max': 800, 'unit': 'lux'}
+}
+
+class AlertSystem:
     def __init__(self):
-        # Threshold configurations
-        self.thresholds = {
-            'temperature': {
-                'min': 20,
-                'max': 28,
-                'unit': '°C',
-                'name': 'Temperature'
-            },
-            'humidity': {
-                'min': 40,
-                'max': 60,
-                'unit': '%',
-                'name': 'Humidity'
-            },
-            'co2': {
-                'min': 400,
-                'max': 1000,
-                'unit': 'ppm',
-                'name': 'CO2 Level'
-            },
-            'light': {
-                'min': 200,
-                'max': 800,
-                'unit': 'lux',
-                'name': 'Light Level'
-            }
-        }
-        
-        self.alerts_triggered = {
-            'temperature': False,
-            'humidity': False,
-            'co2': False,
-            'light': False
-        }
-        
+        self.active_alerts = {}
         self.alert_count = 0
+        self.message_count = 0
         
-        # MQTT setup
-        self.client = mqtt.Client(
-            client_id="alert_system",
-            callback_api_version=mqtt.CallbackAPIVersion.VERSION2
-        )
-        self.client.on_connect = self.on_connect
-        self.client.on_message = self.on_message
-    
-    def on_connect(self, client, userdata, flags, rc, properties=None):
-        """Callback when connected to MQTT broker"""
-        if rc == 0:
-            print("="*70)
-            print(" 🚨 IoT ALERT SYSTEM - ACTIVE")
-            print("="*70)
-            print(f"\n✅ Connected to MQTT broker")
-            
-            # Subscribe to all sensor topics
-            topics = [
-                "hostel/room1/temperature",
-                "hostel/room1/humidity",
-                "hostel/room1/co2",
-                "hostel/room1/light"
-            ]
-            
-            for topic in topics:
-                client.subscribe(topic)
-            
-            print(f"📡 Monitoring {len(topics)} sensor topics")
-            print("\n📊 Threshold Configuration:")
-            print("-" * 70)
-            
-            for sensor, config in self.thresholds.items():
-                print(f"   {config['name']:15} : {config['min']:>6} - {config['max']:>6} {config['unit']}")
-            
-            print("\n" + "="*70)
-            print(" 👂 Listening for sensor data... (Press Ctrl+C to stop)")
-            print("="*70 + "\n")
-    
-    def on_message(self, client, userdata, msg):
-        """Callback when message is received"""
+    def beep(self):
+        """Play system beep sound"""
         try:
-            payload = json.loads(msg.payload.decode())
-            sensor_type = payload.get('sensor_type')
-            value = payload.get('value')
-            timestamp = payload.get('timestamp')
-            
-            if sensor_type in self.thresholds:
-                self.check_threshold(sensor_type, value, timestamp)
-        
+            # Windows beep
+            import winsound
+            winsound.Beep(1000, 500)  # 1000Hz for 500ms - louder and longer
+            print("🔊 BEEP!")
         except Exception as e:
-            print(f"⚠️  Error processing message: {e}")
+            # Fallback
+            print(f'🔊 BEEP! (Sound error: {e})')
+            print('\a')  # ASCII bell character
     
-    def check_threshold(self, sensor_type, value, timestamp):
-        """Check if value exceeds thresholds and trigger alert"""
-        config = self.thresholds[sensor_type]
-        min_val = config['min']
-        max_val = config['max']
+    def check_thresholds(self, sensor_type, value):
+        """Check if value exceeds thresholds"""
+        if sensor_type not in THRESHOLDS:
+            return None
         
-        # Check if value is out of range
-        if value < min_val or value > max_val:
-            # Only trigger alert if not already active for this sensor
-            if not self.alerts_triggered[sensor_type]:
-                self.trigger_alert(sensor_type, value, min_val, max_val, timestamp)
-                self.alerts_triggered[sensor_type] = True
-        else:
-            # Value back to normal
-            if self.alerts_triggered[sensor_type]:
-                self.clear_alert(sensor_type, value, timestamp)
-                self.alerts_triggered[sensor_type] = False
+        threshold = THRESHOLDS[sensor_type]
+        
+        # Check minimum threshold
+        if threshold['min'] is not None and value < threshold['min']:
+            return {
+                'type': 'LOW',
+                'threshold': threshold['min'],
+                'value': value,
+                'unit': threshold['unit']
+            }
+        
+        # Check maximum threshold
+        if threshold['max'] is not None and value > threshold['max']:
+            return {
+                'type': 'HIGH',
+                'threshold': threshold['max'],
+                'value': value,
+                'unit': threshold['unit']
+            }
+        
+        return None
     
-    def trigger_alert(self, sensor_type, value, min_val, max_val, timestamp):
+    def trigger_alert(self, sensor_type, alert_info):
         """Trigger an alert"""
-        self.alert_count += 1
-        config = self.thresholds[sensor_type]
+        alert_key = f"{sensor_type}_{alert_info['type']}"
         
-        # Determine if too high or too low
-        if value < min_val:
-            alert_type = "TOO LOW"
-            emoji = "❄️"
+        # Only trigger if not already active
+        if alert_key not in self.active_alerts:
+            self.active_alerts[alert_key] = True
+            self.alert_count += 1
+            
+            # Beep sound - BEEP THREE TIMES for emphasis
+            self.beep()
+            
+            # Visual alert
+            emoji = {'temperature': '🌡️', 'humidity': '💧', 'co2': '🌫️', 'light': '💡'}.get(sensor_type, '📊')
+            
+            print(f"\n{'='*70}")
+            print(f"🚨🚨🚨 ALERT #{self.alert_count} - {alert_info['type']} {sensor_type.upper()} 🚨🚨🚨")
+            print(f"{'='*70}")
+            print(f"{emoji} Current Value: {alert_info['value']}{alert_info['unit']}")
+            print(f"⚠️  Threshold Limit: {alert_info['threshold']}{alert_info['unit']}")
+            print(f"🕐 Time: {datetime.now().strftime('%H:%M:%S')}")
+            print(f"{'='*70}\n")
+    
+    def clear_alert(self, sensor_type, value, unit):
+        """Clear alerts when value returns to normal"""
+        cleared = []
+        
+        for alert_key in list(self.active_alerts.keys()):
+            if alert_key.startswith(sensor_type):
+                del self.active_alerts[alert_key]
+                cleared.append(alert_key)
+        
+        if cleared:
+            emoji = {'temperature': '🌡️', 'humidity': '💧', 'co2': '🌫️', 'light': '💡'}.get(sensor_type, '📊')
+            print(f"\n{'='*70}")
+            print(f"✅ ALERT CLEARED - {sensor_type.upper()}")
+            print(f"{'='*70}")
+            print(f"{emoji} Current Value: {value}{unit} (Back to normal)")
+            print(f"🕐 Time: {datetime.now().strftime('%H:%M:%S')}")
+            print(f"{'='*70}\n")
+
+# Global alert system instance
+alert_system = AlertSystem()
+
+def on_connect(client, userdata, flags, rc, properties=None):
+    """Callback when connected to MQTT broker"""
+    if rc == 0:
+        print(f"✅ Connected to MQTT Broker: {MQTT_BROKER}:{MQTT_PORT}")
+        for topic in MQTT_TOPICS:
+            client.subscribe(topic)
+            print(f"📡 Subscribed to: {topic}")
+        print(f"\n🎯 Alert System Active - Listening for sensor data...\n")
+    else:
+        print(f"❌ Connection failed with code {rc}")
+
+def on_message(client, userdata, msg):
+    """Callback when message received"""
+    try:
+        alert_system.message_count += 1
+        data = json.loads(msg.payload.decode())
+        
+        sensor_type = data.get('sensor_type')
+        value = data.get('value')
+        unit = data.get('unit', '')
+        
+        # Show incoming data for debugging
+        print(f"📥 [{alert_system.message_count}] Received: {sensor_type} = {value}{unit}")
+        
+        # Check thresholds
+        alert_info = alert_system.check_thresholds(sensor_type, value)
+        
+        if alert_info:
+            # Alert triggered
+            alert_system.trigger_alert(sensor_type, alert_info)
         else:
-            alert_type = "TOO HIGH"
-            emoji = "🔥"
-        
-        print("\n" + "🚨" * 35)
-        print(f"\n  ⚠️  ALERT #{self.alert_count} - {alert_type}")
-        print(f"  📊 Sensor: {config['name']}")
-        print(f"  📈 Current Value: {value} {config['unit']}")
-        print(f"  ✅ Safe Range: {min_val} - {max_val} {config['unit']}")
-        print(f"  ⏰ Time: {datetime.now().strftime('%H:%M:%S')}")
-        print(f"\n{'🚨' * 35}\n")
-        
-        # Play alert sound (Windows beep)
-        try:
-            # Play system beep: frequency, duration
-            winsound.Beep(1000, 500)  # 1000 Hz for 500ms
-        except:
-            print("🔇 (Sound not available)")
+            # Value normal - clear any active alerts
+            alert_system.clear_alert(sensor_type, value, unit)
     
-    def clear_alert(self, sensor_type, value, timestamp):
-        """Clear an alert when value returns to normal"""
-        config = self.thresholds[sensor_type]
-        
-        print("\n" + "✅" * 35)
-        print(f"\n  ✅ ALERT CLEARED")
-        print(f"  📊 Sensor: {config['name']}")
-        print(f"  📈 Current Value: {value} {config['unit']}")
-        print(f"  ⏰ Time: {datetime.now().strftime('%H:%M:%S')}")
-        print(f"\n{'✅' * 35}\n")
-        
-        # Play success sound
-        try:
-            winsound.Beep(2000, 200)  # Higher pitch, shorter
-        except:
-            pass
+    except Exception as e:
+        print(f"❌ Error processing message: {e}")
+
+def main():
+    """Main function"""
+    print(f"\n{'='*70}")
+    print(f"🚨 IoT ALERT SYSTEM - Starting...")
+    print(f"{'='*70}\n")
     
-    def run(self):
-        """Start the alert system"""
-        try:
-            self.client.connect("test.mosquitto.org", 1883, 60)
-            self.client.loop_forever()
-        
-        except KeyboardInterrupt:
-            print("\n\n⏹️  Alert system stopped by user")
-            print(f"\n📊 Total alerts triggered: {self.alert_count}")
-            print("="*70)
-        
-        except Exception as e:
-            print(f"\n❌ Error: {e}")
-        
-        finally:
-            self.client.disconnect()
+    print(f"📋 Alert Thresholds:")
+    for sensor, threshold in THRESHOLDS.items():
+        emoji = {'temperature': '🌡️', 'humidity': '💧', 'co2': '🌫️', 'light': '💡'}.get(sensor, '📊')
+        min_val = f"{threshold['min']}{threshold['unit']}" if threshold['min'] else "None"
+        max_val = f"{threshold['max']}{threshold['unit']}" if threshold['max'] else "None"
+        print(f"   {emoji} {sensor.title()}: {min_val} - {max_val}")
+    print()
+    
+    # Create MQTT client
+    client = mqtt.Client(
+        client_id="alert_system",
+        callback_api_version=mqtt.CallbackAPIVersion.VERSION2
+    )
+    
+    client.on_connect = on_connect
+    client.on_message = on_message
+    
+    # Connect and start
+    try:
+        print(f"🔌 Connecting to MQTT broker...\n")
+        client.connect(MQTT_BROKER, MQTT_PORT, 60)
+        client.loop_forever()
+    except KeyboardInterrupt:
+        print(f"\n\n⏸️  Alert system stopped by user")
+        print(f"📊 Final Stats: {alert_system.message_count} messages, "
+              f"{alert_system.alert_count} total alerts\n")
+    except Exception as e:
+        print(f"\n❌ Error: {e}\n")
+    finally:
+        client.disconnect()
 
 if __name__ == "__main__":
-    print("\n💡 TIP: Run sensors in other terminals to test alerts!")
-    print("   Alerts trigger when values go outside safe ranges:\n")
-    print("   - Temperature: Outside 20-28°C")
-    print("   - Humidity: Outside 40-60%")
-    print("   - CO2: Above 1000 ppm")
-    print("   - Light: Outside 200-800 lux\n")
-    
-    input("Press Enter to start alert system... (Ctrl+C to stop)\n")
-    
-    alert_system = IoTAlertSystem()
-    alert_system.run()
+    main()
