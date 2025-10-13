@@ -39,10 +39,10 @@ MQTT_TOPICS = [
 class DataStore:
     def __init__(self):
         self.lock = threading.Lock()
-        self.temperature_data = deque(maxlen=50)
-        self.humidity_data = deque(maxlen=50)
-        self.co2_data = deque(maxlen=50)
-        self.light_data = deque(maxlen=50)
+        self.temperature_data = deque(maxlen=100)
+        self.humidity_data = deque(maxlen=100)
+        self.co2_data = deque(maxlen=100)
+        self.light_data = deque(maxlen=100)
         self.last_update = None
         self.message_count = 0
         self.connected = False
