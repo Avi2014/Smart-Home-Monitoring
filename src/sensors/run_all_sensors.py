@@ -21,16 +21,15 @@ def main():
     print("="*70)
     print(" 🏠 SMART HOME IOT MONITORING SYSTEM - SENSOR SUITE")
     print("="*70)
-    print("\n📋 This will start all sensor simulators:")
+    print("\n📋 Starting all sensor simulators:")
     print("   - Temperature Sensor (every 3s)")
     print("   - Humidity Sensor (every 3s)")
-    print("   - CO2 Sensor (every 5s)")
-    print("   - Light Sensor (every 4s)")
-    print("\n⚠️  NOTE: Each sensor runs in a separate terminal window")
-    print("   Make sure MQTT broker is running first!")
-    print("\n" + "="*70 + "\n")
+    print("   - CO2 Sensor (every 3s)")
+    print("   - Light Sensor (every 3s)")
+    print("\n⚡ Auto-starting sensors now...")
+    print("="*70 + "\n")
     
-    input("Press Enter to start all sensors (or Ctrl+C to cancel)...")
+    time.sleep(1)  # Brief pause for display
     
     for sensor in sensors:
         sensor_path = os.path.join(script_dir, sensor)

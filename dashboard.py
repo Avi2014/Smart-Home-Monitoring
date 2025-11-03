@@ -141,9 +141,10 @@ def on_connect(client, userdata, flags, rc, properties=None):
     if rc == 0:
         data_store.set_connected(True)
         print(f"✅ Connected to MQTT broker successfully")
+        print(f"📡 Subscribing to topics:")
         for topic in MQTT_TOPICS:
             result = client.subscribe(topic, qos=1)
-            print(f"Subscribed to {topic}: {result}")
+            print(f"   - {topic}: {result}")
     else:
         data_store.set_connected(False)
         print(f"❌ Connection failed with code {rc}")
@@ -167,11 +168,14 @@ def on_disconnect(client, userdata, disconnect_flags, rc, properties=None):
 def on_message(client, userdata, msg):
     """Callback when message is received"""
     try:
+        print(f"📨 Received message on topic: {msg.topic}")
         payload = json.loads(msg.payload.decode())
         sensor_type = payload.get('sensor_type')
         value = payload.get('value')
         timestamp = payload.get('timestamp')
         battery = payload.get('battery_level', 100)
+        
+        print(f"   Sensor: {sensor_type}, Value: {value}, Battery: {battery}%")
         
         # Debug print (only every 10th message to reduce spam)
         if data_store.get_stats()['message_count'] % 10 == 0:
@@ -181,6 +185,7 @@ def on_message(client, userdata, msg):
         
     except Exception as e:
         print(f"❌ Error processing message: {e}")
+        print(f"   Topic: {msg.topic}, Payload: {msg.payload}")
 
 # Start MQTT client in background
 @st.cache_resource
@@ -418,13 +423,16 @@ st.subheader("📊 Current Sensor Readings")
 
 gauge_col1, gauge_col2, gauge_col3, gauge_col4 = st.columns(4)
 
+# Use timestamp in keys to force updates
+gauge_key_suffix = int(time.time() * 1000)
+
 with gauge_col1:
     temp_data = data_store.get_data('temperature')
     temp_val = temp_data[-1]['value'] if temp_data else 22
     st.plotly_chart(
         create_gauge(temp_val, "🌡️ Temperature", 15, 40, "°C", [20, 28]),
         use_container_width=True,
-        key="gauge_temp"
+        key=f"gauge_temp_{gauge_key_suffix}"
     )
 
 with gauge_col2:
@@ -433,7 +441,7 @@ with gauge_col2:
     st.plotly_chart(
         create_gauge(hum_val, "💧 Humidity", 0, 100, "%", [40, 60]),
         use_container_width=True,
-        key="gauge_hum"
+        key=f"gauge_hum_{gauge_key_suffix}"
     )
 
 with gauge_col3:
@@ -442,7 +450,7 @@ with gauge_col3:
     st.plotly_chart(
         create_gauge(co2_val, "🌫️ CO2", 400, 2000, "ppm", [400, 1000]),
         use_container_width=True,
-        key="gauge_co2"
+        key=f"gauge_co2_{gauge_key_suffix}"
     )
 
 with gauge_col4:
@@ -451,7 +459,7 @@ with gauge_col4:
     st.plotly_chart(
         create_gauge(light_val, "💡 Light", 0, 1000, "lux", [200, 800]),
         use_container_width=True,
-        key="gauge_light"
+        key=f"gauge_light_{gauge_key_suffix}"
     )
 
 st.divider()
@@ -459,30 +467,33 @@ st.divider()
 # Trend Charts Section
 st.subheader("📈 Historical Trends")
 
+# Use timestamp in keys to force chart updates
+chart_key_suffix = int(time.time() * 1000)  # Milliseconds
+
 trend_col1, trend_col2 = st.columns(2)
 
 with trend_col1:
     st.plotly_chart(
         create_trend_chart(data_store.get_data('temperature'), "Temperature", "#FF6B6B", "°C"),
         use_container_width=True,
-        key="trend_temp"
+        key=f"trend_temp_{chart_key_suffix}"
     )
     st.plotly_chart(
         create_trend_chart(data_store.get_data('co2'), "CO2 Level", "#95E1D3", "ppm"),
         use_container_width=True,
-        key="trend_co2"
+        key=f"trend_co2_{chart_key_suffix}"
     )
 
 with trend_col2:
     st.plotly_chart(
         create_trend_chart(data_store.get_data('humidity'), "Humidity", "#4ECDC4", "%"),
         use_container_width=True,
-        key="trend_hum"
+        key=f"trend_hum_{chart_key_suffix}"
     )
     st.plotly_chart(
         create_trend_chart(data_store.get_data('light'), "Light Level", "#FFE66D", "lux"),
         use_container_width=True,
-        key="trend_light"
+        key=f"trend_light_{chart_key_suffix}"
     )
 
 # Auto-refresh footer

@@ -38,7 +38,7 @@
       "max_value": 2000.0,
       "normal_range": [400.0, 1000.0],
       "unit": "ppm",
-      "sampling_rate": 5,
+      "sampling_rate": 3,
       "variance": 50.0
     },
     "light": {
@@ -47,7 +47,7 @@
       "max_value": 1000.0,
       "normal_range": [200.0, 800.0],
       "unit": "lux",
-      "sampling_rate": 4,
+      "sampling_rate": 3,
       "variance": 30.0
     }
   },
@@ -59,7 +59,7 @@
   },
   "battery": {
     "initial_charge": 100.0,
-    "drain_per_message": 0.001,
+    "drain_per_message": 0.0,
     "sleep_mode_enabled": false
   }
 }

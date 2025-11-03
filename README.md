@@ -7,6 +7,21 @@
 
 > Real-time IoT environmental monitoring system for smart homes with interactive dashboard, alert system, and sensor simulators.
 
+## 🚀 Quick Start - One Simple Command!
+
+```powershell
+.\start.ps1
+```
+
+**That's it!** The entire system launches automatically with all components running.
+
+- 📊 **Dashboard** → http://localhost:8501
+- 🔔 **Alert System** → Monitoring thresholds
+- 📡 **Sensors** → Generating realistic data
+- 🎮 **Control Panel** → Manual testing
+
+---
+
 ## 🎯 Features
 
 - 📊 **Real-Time Dashboard** - Beautiful Streamlit web interface with live gauges and charts
