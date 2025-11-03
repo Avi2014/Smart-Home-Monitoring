@@ -1,9 +1,11 @@
 {
   "mqtt": {
-    "broker": "test.mosquitto.org",
-    "port": 1883,
+    "broker": "95c2f02d61404267847ebc19552f72b0.s1.eu.hivemq.cloud",
+    "port": 8883,
+    "client_id_prefix": "iot_sensor",
     "keepalive": 60,
     "qos": 1,
+    "use_tls": true,
     "topics": {
       "temperature": "hostel/room1/temperature",
       "humidity": "hostel/room1/humidity",

@@ -6,7 +6,13 @@ Tests MQTT broker connectivity without user interaction
 import paho.mqtt.client as mqtt
 import time
 import json
+import ssl
+import os
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 def test_mqtt_connection():
     """Test if we can connect to MQTT broker"""
@@ -15,11 +21,16 @@ def test_mqtt_connection():
     print(" 🔌 MQTT CONNECTION TEST")
     print("="*70)
     
-    broker = "test.mosquitto.org"
-    port = 1883
+    broker = os.getenv("MQTT_BROKER", "95c2f02d61404267847ebc19552f72b0.s1.eu.hivemq.cloud")
+    port = int(os.getenv("MQTT_PORT", 8883))
+    username = os.getenv("MQTT_USERNAME", None)
+    password = os.getenv("MQTT_PASSWORD", None)
+    use_tls = os.getenv("MQTT_USE_TLS", "true").lower() == "true"
     
     print(f"\n🌐 Broker: {broker}")
     print(f"🔌 Port: {port}")
+    print(f"🔐 TLS: {'✅ Enabled' if use_tls else '❌ Disabled'}")
+    print(f"🔑 Auth: {'✅ Enabled' if username else '❌ Disabled'}")
     print("\n" + "-"*70)
     
     connected = False
@@ -37,15 +48,27 @@ def test_mqtt_connection():
         
         client = mqtt.Client(
             client_id="connection_tester",
-            callback_api_version=mqtt.CallbackAPIVersion.VERSION2
+            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+            protocol=mqtt.MQTTv311
         )
         client.on_connect = on_connect
+        
+        # Set credentials if available
+        if username and password:
+            client.username_pw_set(username, password)
+        
+        # Enable TLS if required
+        if use_tls:
+            client.tls_set(
+                cert_reqs=ssl.CERT_REQUIRED,
+                tls_version=ssl.PROTOCOL_TLSv1_2
+            )
         
         client.connect(broker, port, 60)
         client.loop_start()
         
-        # Wait up to 5 seconds for connection
-        timeout = 5
+        # Wait up to 10 seconds for connection (TLS takes longer)
+        timeout = 10
         start = time.time()
         while not connected and (time.time() - start) < timeout:
             time.sleep(0.1)

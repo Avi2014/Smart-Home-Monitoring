@@ -5,23 +5,46 @@ Tests all major functionalities
 import paho.mqtt.client as mqtt
 import json
 import time
+import ssl
+import os
 from datetime import datetime
+from dotenv import load_dotenv
 
-MQTT_BROKER = "test.mosquitto.org"
-MQTT_PORT = 1883
+# Load environment variables
+load_dotenv()
+
+# MQTT Configuration
+MQTT_BROKER = os.getenv("MQTT_BROKER", "95c2f02d61404267847ebc19552f72b0.s1.eu.hivemq.cloud")
+MQTT_PORT = int(os.getenv("MQTT_PORT", 8883))
+MQTT_USERNAME = os.getenv("MQTT_USERNAME", None)
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", None)
+MQTT_USE_TLS = os.getenv("MQTT_USE_TLS", "true").lower() == "true"
 
 class TestScenarios:
     def __init__(self):
         self.client = mqtt.Client(
             client_id="test_scenarios",
-            callback_api_version=mqtt.CallbackAPIVersion.VERSION2
+            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+            protocol=mqtt.MQTTv311
         )
         self.connected = False
         
     def connect(self):
         """Connect to MQTT broker"""
         try:
-            print("🔌 Connecting to MQTT broker...")
+            print(f"🔌 Connecting to {MQTT_BROKER}:{MQTT_PORT}...")
+            
+            # Set credentials if available
+            if MQTT_USERNAME and MQTT_PASSWORD:
+                self.client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+            
+            # Enable TLS if required
+            if MQTT_USE_TLS:
+                self.client.tls_set(
+                    cert_reqs=ssl.CERT_REQUIRED,
+                    tls_version=ssl.PROTOCOL_TLSv1_2
+                )
+            
             self.client.connect(MQTT_BROKER, MQTT_PORT, 60)
             self.client.loop_start()
             time.sleep(2)

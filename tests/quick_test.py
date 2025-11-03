@@ -6,8 +6,8 @@ import json
 from datetime import datetime
 import time
 
-MQTT_BROKER = "test.mosquitto.org"
-MQTT_PORT = 1883
+MQTT_BROKER = "95c2f02d61404267847ebc19552f72b0.s1.eu.hivemq.cloud"
+MQTT_PORT = 8883
 
 print("🚨 QUICK ALARM TEST")
 print("="*60)

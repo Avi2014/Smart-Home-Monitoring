@@ -6,17 +6,37 @@ import paho.mqtt.client as mqtt
 import json
 import os
 import sys
+import ssl
 from datetime import datetime
+from dotenv import load_dotenv
 
-# MQTT Configuration
-MQTT_BROKER = "test.mosquitto.org"
-MQTT_PORT = 1883
+# Load environment variables from .env file
+load_dotenv()
+
+# MQTT Configuration - Load from environment variables
+MQTT_BROKER = os.getenv("MQTT_BROKER", "95c2f02d61404267847ebc19552f72b0.s1.eu.hivemq.cloud")
+MQTT_PORT = int(os.getenv("MQTT_PORT", 8883))
+MQTT_USERNAME = os.getenv("MQTT_USERNAME", None)
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", None)
+MQTT_USE_TLS = os.getenv("MQTT_USE_TLS", "true").lower() == "true"
+
 MQTT_TOPICS = [
-    "hostel/room1/temperature",
-    "hostel/room1/humidity",
-    "hostel/room1/co2",
-    "hostel/room1/light"
+    os.getenv("MQTT_TOPIC_TEMPERATURE", "hostel/room1/temperature"),
+    os.getenv("MQTT_TOPIC_HUMIDITY", "hostel/room1/humidity"),
+    os.getenv("MQTT_TOPIC_CO2", "hostel/room1/co2"),
+    os.getenv("MQTT_TOPIC_LIGHT", "hostel/room1/light")
 ]
+
+# Validate credentials
+if not MQTT_BROKER or not MQTT_USERNAME or not MQTT_PASSWORD:
+    print("❌ Error: MQTT credentials not found!")
+    print("Please create a .env file with:")
+    print("  MQTT_BROKER=your-broker-url")
+    print("  MQTT_PORT=8883")
+    print("  MQTT_USERNAME=your-username")
+    print("  MQTT_PASSWORD=your-password")
+    print("  MQTT_USE_TLS=true")
+    sys.exit(1)
 
 # Alert Thresholds
 THRESHOLDS = {
@@ -80,7 +100,7 @@ class AlertSystem:
             self.active_alerts[alert_key] = True
             self.alert_count += 1
             
-            # Beep sound - BEEP THREE TIMES for emphasis
+            # Beep sound
             self.beep()
             
             # Visual alert
@@ -124,7 +144,20 @@ def on_connect(client, userdata, flags, rc, properties=None):
             print(f"📡 Subscribed to: {topic}")
         print(f"\n🎯 Alert System Active - Listening for sensor data...\n")
     else:
-        print(f"❌ Connection failed with code {rc}")
+        error_messages = {
+            1: "Connection refused - incorrect protocol version",
+            2: "Connection refused - invalid client identifier",
+            3: "Connection refused - server unavailable",
+            4: "Connection refused - bad username or password",
+            5: "Connection refused - not authorized"
+        }
+        print(f"❌ Connection failed with code {rc}: {error_messages.get(rc, 'Unknown error')}")
+        sys.exit(1)
+
+def on_disconnect(client, userdata, disconnect_flags, rc, properties=None):
+    """Callback when disconnected"""
+    if rc != 0:
+        print(f"⚠️ Unexpected disconnection (code: {rc}). Attempting to reconnect...")
 
 def on_message(client, userdata, msg):
     """Callback when message received"""
@@ -158,6 +191,12 @@ def main():
     print(f"🚨 IoT ALERT SYSTEM - Starting...")
     print(f"{'='*70}\n")
     
+    print(f"📋 MQTT Configuration:")
+    print(f"   Broker: {MQTT_BROKER}")
+    print(f"   Port: {MQTT_PORT}")
+    print(f"   TLS: {'✅ Enabled' if MQTT_USE_TLS else '❌ Disabled'}")
+    print(f"   Auth: {'✅ Enabled' if MQTT_USERNAME else '❌ Disabled'}\n")
+    
     print(f"📋 Alert Thresholds:")
     for sensor, threshold in THRESHOLDS.items():
         emoji = {'temperature': '🌡️', 'humidity': '💧', 'co2': '🌫️', 'light': '💡'}.get(sensor, '📊')
@@ -169,11 +208,23 @@ def main():
     # Create MQTT client
     client = mqtt.Client(
         client_id="alert_system",
-        callback_api_version=mqtt.CallbackAPIVersion.VERSION2
+        callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+        protocol=mqtt.MQTTv311
     )
     
     client.on_connect = on_connect
     client.on_message = on_message
+    
+    # Set username and password if provided
+    if MQTT_USERNAME and MQTT_PASSWORD:
+        client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+    
+    # Enable TLS if required (for HiveMQ Cloud)
+    if MQTT_USE_TLS:
+        client.tls_set(
+            cert_reqs=ssl.CERT_REQUIRED,
+            tls_version=ssl.PROTOCOL_TLSv1_2
+        )
     
     # Connect and start
     try:

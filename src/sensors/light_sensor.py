@@ -8,8 +8,14 @@ import json
 import time
 import random
 import math
+import ssl
+import os
 from datetime import datetime
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -25,7 +31,14 @@ class LightSensor:
         with open(config_file, 'r') as f:
             self.config = json.load(f)
         
+        # Override MQTT config with environment variables
         self.mqtt_config = self.config['mqtt']
+        self.mqtt_config['broker'] = os.getenv("MQTT_BROKER", self.mqtt_config.get('broker'))
+        self.mqtt_config['port'] = int(os.getenv("MQTT_PORT", self.mqtt_config.get('port', 8883)))
+        self.mqtt_config['use_tls'] = os.getenv("MQTT_USE_TLS", "true").lower() == "true"
+        self.mqtt_username = os.getenv("MQTT_USERNAME", None)
+        self.mqtt_password = os.getenv("MQTT_PASSWORD", None)
+        
         self.sensor_config = self.config['sensors']['light']
         self.battery_config = self.config['battery']
         
@@ -38,19 +51,34 @@ class LightSensor:
         self.message_count = 0
         
         # MQTT client
-        self.client = mqtt.Client(client_id="light_sensor_001")
+        self.client = mqtt.Client(
+            client_id="light_sensor_001",
+            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+            protocol=mqtt.MQTTv311
+        )
         self.client.on_connect = self.on_connect
         self.client.on_publish = self.on_publish
         
-    def on_connect(self, client, userdata, flags, rc):
+        # Set credentials if available
+        if self.mqtt_username and self.mqtt_password:
+            self.client.username_pw_set(self.mqtt_username, self.mqtt_password)
+        
+        # Enable TLS if required
+        if self.mqtt_config.get('use_tls', False):
+            self.client.tls_set(
+                cert_reqs=ssl.CERT_REQUIRED,
+                tls_version=ssl.PROTOCOL_TLSv1_2
+            )
+        
+    def on_connect(self, client, userdata, flags, rc, properties=None):
         """Callback when connected to MQTT broker"""
         if rc == 0:
             logger.info(f"✅ Connected to MQTT Broker at {self.mqtt_config['broker']}:{self.mqtt_config['port']}")
         else:
             logger.error(f"❌ Failed to connect, return code {rc}")
     
-    def on_publish(self, client, userdata, mid):
-        """Callback when message is published"""
+    def on_publish(self, client, userdata, mid, reason_code=None, properties=None):
+        """Callback when message is published (paho-mqtt 2.x compatible)"""
         logger.debug(f"Message {mid} published successfully")
     
     def generate_realistic_value(self):
@@ -158,39 +186,44 @@ class LightSensor:
             print("Press Ctrl+C to stop the sensor")
             print("="*60 + "\n")
             
-            while self.battery_level > 0:
-                # Generate sensor reading
-                light = self.generate_realistic_value()
-                
-                # Create and publish message
-                message = self.create_message(light)
-                result = self.client.publish(
-                    topic,
-                    message,
-                    qos=self.mqtt_config['qos']
-                )
-                
-                # Log reading
-                if light < 50:
-                    status = "🌙"
-                elif light < 200:
-                    status = "🕯️"
-                elif light < 500:
-                    status = "💡"
-                else:
-                    status = "☀️"
-                
-                logger.info(
-                    f"{status} Light: {light} lux | "
-                    f"Battery: {self.battery_level:.1f}% | "
-                    f"Messages: {self.message_count}"
-                )
-                
-                # Update battery
-                self.update_battery()
-                
-                # Wait for next reading
-                time.sleep(sampling_rate)
+            while True:  # Run continuously
+                try:
+                    # Generate sensor reading
+                    light = self.generate_realistic_value()
+                    
+                    # Create and publish message
+                    message = self.create_message(light)
+                    result = self.client.publish(
+                        topic,
+                        message,
+                        qos=self.mqtt_config['qos']
+                    )
+                    
+                    # Log reading
+                    if light < 50:
+                        status = "🌙"
+                    elif light < 200:
+                        status = "🕯️"
+                    elif light < 500:
+                        status = "💡"
+                    else:
+                        status = "☀️"
+                    
+                    logger.info(
+                        f"{status} Light: {light} lux | "
+                        f"Battery: {self.battery_level:.1f}% | "
+                        f"Messages: {self.message_count}"
+                    )
+                    
+                    # Update battery (simulate drain but don't stop)
+                    self.update_battery()
+                    
+                    # Wait for next reading
+                    time.sleep(sampling_rate)
+                except Exception as e:
+                    logger.error(f"Error in sensor loop: {e}")
+                    time.sleep(1)  # Brief pause before retry
+                    continue
                 
         except KeyboardInterrupt:
             logger.info("\n⏹️  Sensor stopped by user")

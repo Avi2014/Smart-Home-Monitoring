@@ -3,27 +3,52 @@ Quick Alarm Test - Publish high temperature to trigger alarm
 """
 import paho.mqtt.client as mqtt
 import json
+import ssl
+import os
 from datetime import datetime
 import time
+from dotenv import load_dotenv
 
-MQTT_BROKER = "test.mosquitto.org"
-MQTT_PORT = 1883
+# Load environment variables
+load_dotenv()
+
+# MQTT Configuration
+MQTT_BROKER = os.getenv("MQTT_BROKER", "95c2f02d61404267847ebc19552f72b0.s1.eu.hivemq.cloud")
+MQTT_PORT = int(os.getenv("MQTT_PORT", 8883))
+MQTT_USERNAME = os.getenv("MQTT_USERNAME", None)
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", None)
+MQTT_USE_TLS = os.getenv("MQTT_USE_TLS", "true").lower() == "true"
 
 print("🚨 QUICK ALARM TEST")
 print("="*60)
+print(f"Broker: {MQTT_BROKER}:{MQTT_PORT}")
 print("Publishing HIGH TEMPERATURE (35°C) to trigger alarm...")
 print()
 
 # Create client
 client = mqtt.Client(
     client_id="quick_test",
-    callback_api_version=mqtt.CallbackAPIVersion.VERSION2
+    callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+    protocol=mqtt.MQTTv311
 )
 
+# Set credentials if available
+if MQTT_USERNAME and MQTT_PASSWORD:
+    client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+
+# Enable TLS if required
+if MQTT_USE_TLS:
+    client.tls_set(
+        cert_reqs=ssl.CERT_REQUIRED,
+        tls_version=ssl.PROTOCOL_TLSv1_2
+    )
+
 # Connect
+print("⏳ Connecting...")
 client.connect(MQTT_BROKER, MQTT_PORT, 60)
 client.loop_start()
-time.sleep(1)
+time.sleep(2)
+print("✅ Connected!\n")
 
 # Publish high temperature
 message = {
